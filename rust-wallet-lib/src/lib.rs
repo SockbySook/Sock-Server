@@ -10,7 +10,9 @@ use web3::transports::Http;
 use web3::signing::{Key, SecretKey};
 use tokio::runtime::Runtime;
 use k256::elliptic_curve::generic_array::{GenericArray, typenum};
+use std::env;
 
+/// ✅ 24개 단어 니모닉을 생성
 #[no_mangle]
 pub extern "C" fn generate_mnemonic() -> *mut c_char {
     let mut entropy = [0u8; 32];
@@ -24,6 +26,7 @@ pub extern "C" fn generate_mnemonic() -> *mut c_char {
     CString::new(mnemonic.to_string()).unwrap().into_raw()
 }
 
+/// ✅ 새로운 지갑 주소 생성
 #[no_mangle]
 pub extern "C" fn generate_address() -> *mut c_char {
     let mut entropy = [0u8; 32];
@@ -40,26 +43,43 @@ pub extern "C" fn generate_address() -> *mut c_char {
     CString::new(address).unwrap().into_raw()
 }
 
+/// ✅ 특정 주소의 잔액을 조회
 #[no_mangle]
-pub extern "C" fn get_balance() -> *mut c_char {
+pub extern "C" fn get_balance_by_address(address: *const c_char) -> *mut c_char {
+    if address.is_null() {
+        return CString::new("Invalid address").unwrap().into_raw();
+    }
+
+    let addr_str = unsafe { CStr::from_ptr(address).to_string_lossy().into_owned() };
+    let parsed_address = match Address::from_str(&addr_str) {
+        Ok(a) => a,
+        Err(_) => return CString::new("Invalid address format").unwrap().into_raw(),
+    };
+
     let rt = Runtime::new().unwrap();
     let result = rt.block_on(async {
         let http = Http::new("https://rpc-amoy.polygon.technology").unwrap();
         let web3 = web3::Web3::new(http);
 
-        let address = Address::from_str("0xCBEF9fEd729a420177A05385e7eeA95C69c1784B").unwrap();
-        match web3.eth().balance(address, None).await {
+        match web3.eth().balance(parsed_address, None).await {
             Ok(balance) => {
-                let eth_float = balance.as_u128() as f64 / 1e18;
-                format!("{:.6}", eth_float)
+                let matic_float = balance.as_u128() as f64 / 1e18;
+                // JSON 형태로 반환
+                format!(
+                    "{{\"balance\": \"{:.6}\", \"symbol\": \"MATIC\", \"network\": \"polygon-amoy\"}}",
+                    matic_float
+                )
             },
-            Err(_) => "0.000000".to_string(),
+            Err(_) => {
+                "{\"balance\": \"0.000000\", \"symbol\": \"MATIC\", \"network\": \"polygon-amoy\"}".to_string()
+            },
         }
     });
 
     CString::new(result).unwrap().into_raw()
 }
 
+/// ✅ 트랜잭션 전송 후 트랜잭션 해시 반환
 #[no_mangle]
 pub extern "C" fn send_transaction(to: *const c_char, amount: *const c_char, private_key: *const c_char) -> *mut c_char {
     let to_str = unsafe { CStr::from_ptr(to).to_str().unwrap_or_default() };
@@ -111,6 +131,7 @@ pub extern "C" fn send_transaction(to: *const c_char, amount: *const c_char, pri
     }
 }
 
+/// ✅ FFI 메모리 해제 함수
 #[no_mangle]
 pub extern "C" fn free_string(s: *mut c_char) {
     if s.is_null() { return; }
@@ -119,6 +140,7 @@ pub extern "C" fn free_string(s: *mut c_char) {
     }
 }
 
+/// ✅ Moralis를 통한 트랜잭션 내역 조회
 #[no_mangle]
 pub extern "C" fn get_transaction_history(address: *const c_char) -> *mut c_char {
     use reqwest::blocking::Client;
@@ -131,7 +153,7 @@ pub extern "C" fn get_transaction_history(address: *const c_char) -> *mut c_char
         CStr::from_ptr(address).to_string_lossy().into_owned()
     };
 
-    let api_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImZiOTgwYzRlLWZjNjUtNDVhZi1hMTcyLTg0NTU4NGM5ZGJjMCIsIm9yZ0lkIjoiNDQ1MDgwIiwidXNlcklkIjoiNDU3OTMyIiwidHlwZUlkIjoiNzg5M2VjOTQtZDA5Yy00YWI3LTgwM2EtYzQ1YzMyMzdlNDExIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NDYyODEwMzgsImV4cCI6NDkwMjA0MTAzOH0.dSuxIQmJ-4yWQqba9-nYUz5RNOtVflmQLJR_WulLQ-8";
+    let api_key = env::var("MORALIS_API_KEY").unwrap_or_else(|_| "".to_string());
     let url = format!(
         "https://mainnet-aptos-api.moralis.io/v2/{}?chain=amoy",
         address
@@ -153,6 +175,7 @@ pub extern "C" fn get_transaction_history(address: *const c_char) -> *mut c_char
     }
 }
 
+/// ✅ 니모닉으로 지갑 복구 (주소와 개인키 반환)
 #[no_mangle]
 pub extern "C" fn recover_wallet_from_mnemonic(mnemonic: *const c_char) -> *mut c_char {
     let mnemonic_str = unsafe {
@@ -197,6 +220,7 @@ pub extern "C" fn recover_wallet_from_mnemonic(mnemonic: *const c_char) -> *mut 
     CString::new(result).unwrap().into_raw()
 }
 
+/// ✅ 니모닉 구문 유효성 검증
 #[no_mangle]
 pub extern "C" fn verify_mnemonic(mnemonic: *const c_char) -> bool {
     if mnemonic.is_null() {
@@ -207,6 +231,7 @@ pub extern "C" fn verify_mnemonic(mnemonic: *const c_char) -> bool {
     Mnemonic::from_str(&mnemonic_str).is_ok()
 }
 
+/// ✅ 송금 가능 여부 확인 (true/false)
 #[no_mangle]
 pub extern "C" fn check_sendable(to: *const c_char, amount: *const c_char, private_key: *const c_char) -> bool {
     let to = unsafe { CStr::from_ptr(to).to_string_lossy().to_string() };
@@ -239,6 +264,7 @@ pub extern "C" fn check_sendable(to: *const c_char, amount: *const c_char, priva
     matches!(result, Ok(true))
 }
 
+/// ✅ 이더스캔 API를 통한 가스비 정보 조회
 #[no_mangle]
 pub extern "C" fn get_gas_price() -> *mut c_char {
     use reqwest::blocking::Client;
@@ -260,7 +286,7 @@ pub extern "C" fn get_gas_price() -> *mut c_char {
         gasUsedRatio: String,
     }
 
-    let api_key = "XEV53A9ZKZRAC3N1JB1NI79E98955Q7TWW";
+    let api_key = std::env::var("ETHERSCAN_API_KEY").unwrap_or_else(|_| "".to_string());
     let url = format!("https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey={}", api_key);
 
     let client = Client::new();
@@ -287,6 +313,7 @@ pub extern "C" fn get_gas_price() -> *mut c_char {
     }
 }
 
+/// ✅ 현재 네트워크 정보 조회
 #[no_mangle]
 pub extern "C" fn get_network_info() -> *mut c_char {
     let rt = Runtime::new().unwrap();
@@ -307,6 +334,8 @@ pub extern "C" fn get_network_info() -> *mut c_char {
 
     CString::new(result).unwrap().into_raw()
 }
+
+/// ✅ 송금 가능 여부 상세 확인 (잔액/가스 포함 JSON 반환)
 #[no_mangle]
 pub extern "C" fn check_sendable_detailed(to: *const c_char, amount: *const c_char, private_key: *const c_char) -> *mut c_char {
     use std::str::FromStr;
@@ -352,4 +381,29 @@ pub extern "C" fn check_sendable_detailed(to: *const c_char, amount: *const c_ch
         Ok(json) => CString::new(json).unwrap().into_raw(),
         Err(_) => CString::new(r#"{"can_send": false, "error": "계산 실패"}"#).unwrap().into_raw(),
     }
+}
+
+/// ✅ 내 지갑 주소 반환
+#[no_mangle]
+pub extern "C" fn get_address_from_private_key(pk_ptr: *const c_char) -> *mut c_char {
+    let pk_str = unsafe { CStr::from_ptr(pk_ptr).to_string_lossy().to_string() };
+    let sk = match SecretKey::from_str(&pk_str) {
+        Ok(s) => s,
+        Err(_) => return CString::new("Invalid private key").unwrap().into_raw(),
+    };
+
+    let address = format!("{:#x}", (&sk).address());
+    CString::new(address).unwrap().into_raw()
+}
+
+/// ✅ private key 생성
+#[no_mangle]
+pub extern "C" fn generate_private_key() -> *mut c_char {
+    let mut entropy = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut entropy);
+
+    let signing_key = SigningKey::from_bytes((&entropy).into()).unwrap();
+    let private_key_hex = hex::encode(signing_key.to_bytes());
+
+    CString::new(private_key_hex).unwrap().into_raw()
 }

@@ -1,23 +1,11 @@
 package main
 
 /*
-#cgo LDFLAGS: -L. -lrust_wallet
+#cgo CFLAGS: -I${SRCDIR}/..
+#cgo LDFLAGS: -L${SRCDIR}/.. -lrust_wallet -framework SystemConfiguration -framework CoreFoundation
 #include <stdlib.h>
 #include <stdbool.h>
-
-char* generate_mnemonic();
-char* generate_address();
-char* get_balance();
-char* send_transaction(const char* to, const char* amount, const char* private_key);
-char* get_transaction_history(const char* address);
-char* recover_wallet_from_mnemonic(const char* mnemonic);
-bool verify_mnemonic(const char* mnemonic);
-bool check_sendable(const char* to, const char* amount, const char* private_key);
-char* get_gas_price();
-char* get_network_info();
-char* check_sendable_detailed(const char* to, const char* amount, const char* private_key);
-char* check_sendable_detailed(const char* to, const char* amount, const char* private_key);
-
+#include "../rust_wallet.h"
 */
 import "C"
 
@@ -25,16 +13,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"go-server/db"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/skip2/go-qrcode"
 	"golang.org/x/crypto/bcrypt"
 
 	//"os"
 	"unsafe"
 )
 
+type passwordPayload struct {
+	Password string `json:"password"`
+}
+
+// ✅ 최근 송금 주소를 DB에 저장
 func saveRecentAddress(address string) {
 	conn := db.GetDB()
 	if conn == nil {
@@ -55,6 +51,7 @@ func saveRecentAddress(address string) {
 	}
 }
 
+// ✅ 니모닉 생성
 func generateMnemonicHandler(w http.ResponseWriter, r *http.Request) {
 	mnemonicPtr := C.generate_mnemonic()
 	mnemonic := C.GoString(mnemonicPtr)
@@ -64,6 +61,7 @@ func generateMnemonicHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// ✅ 새로운 지갑 주소 생성
 func generateAddressHandler(w http.ResponseWriter, r *http.Request) {
 	addrPtr := C.generate_address()
 	address := C.GoString(addrPtr)
@@ -73,15 +71,26 @@ func generateAddressHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// ✅ 현재 지갑 잔액 조회
 func getBalanceHandler(w http.ResponseWriter, r *http.Request) {
-	balancePtr := C.get_balance()
-	balance := C.GoString(balancePtr)
-	C.free(unsafe.Pointer(balancePtr))
+	address := r.URL.Query().Get("address")
+	if address == "" {
+		http.Error(w, "Missing address parameter", http.StatusBadRequest)
+		return
+	}
 
+	addrC := C.CString(address)
+	defer C.free(unsafe.Pointer(addrC))
+
+	resultPtr := C.get_balance_by_address(addrC)
+	defer C.free(unsafe.Pointer(resultPtr))
+
+	balance := C.GoString(resultPtr)
 	resp := map[string]string{"balance": balance + " ETH"}
 	json.NewEncoder(w).Encode(resp)
 }
 
+// ✅ 거래 내역(Moralis API) 가져오기
 func getTxHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	if address == "" {
@@ -89,7 +98,7 @@ func getTxHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiKey := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImZiOTgwYzRlLWZjNjUtNDVhZi1hMTcyLTg0NTU4NGM5ZGJjMCIsIm9yZ0lkIjoiNDQ1MDgwIiwidXNlcklkIjoiNDU3OTMyIiwidHlwZUlkIjoiNzg5M2VjOTQtZDA5Yy00YWI3LTgwM2EtYzQ1YzMyMzdlNDExIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NDYyODEwMzgsImV4cCI6NDkwMjA0MTAzOH0.dSuxIQmJ-4yWQqba9-nYUz5RNOtVflmQLJR_WulLQ-8"
+	apiKey := os.Getenv("MORALIS_API_KEY")
 	url := fmt.Sprintf("https://deep-index.moralis.io/api/v2/%s?chain=amoy", address)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -121,6 +130,7 @@ func getTxHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
+// ✅ FFI 기반 거래 내역 조회
 func getHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	if address == "" {
@@ -139,39 +149,34 @@ func getHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(historyJSON))
 }
 
+// ✅ 니모닉 기반 지갑 복구
 func recoverWalletHandler(w http.ResponseWriter, r *http.Request) {
-	// URL에서 "mnemonic" 파라미터를 추출합니다.
 	mnemonic := r.URL.Query().Get("mnemonic")
 	if mnemonic == "" {
 		http.Error(w, "Missing mnemonic parameter", http.StatusBadRequest)
 		return
 	}
 
-	// C 함수 호출을 위한 CString으로 변환합니다.
 	mnemonicC := C.CString(mnemonic)
 	defer C.free(unsafe.Pointer(mnemonicC))
 
-	// Rust 함수 호출
 	resultPtr := C.recover_wallet_from_mnemonic(mnemonicC)
 	defer C.free(unsafe.Pointer(resultPtr))
 
-	// Rust에서 반환된 결과를 문자열로 변환
 	result := C.GoString(resultPtr)
 
-	// JSON 응답 작성
 	var response map[string]string
 	if result == "Invalid mnemonic" {
 		response = map[string]string{"error": "Invalid mnemonic"}
 	} else {
-		// 복구된 지갑 주소와 개인키를 반환
 		response = map[string]string{"wallet": result}
 	}
 
-	// JSON 응답을 반환
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
+// ✅ 니모닉 유효성 검증
 func verifyMnemonicHandler(w http.ResponseWriter, r *http.Request) {
 	mnemonic := r.URL.Query().Get("mnemonic")
 	if mnemonic == "" {
@@ -188,42 +193,67 @@ func verifyMnemonicHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// ✅ 비밀번호 저장
 func setPasswordHandler(w http.ResponseWriter, r *http.Request) {
-	password := r.URL.Query().Get("password")
-	if password == "" {
-		http.Error(w, "Password is required", http.StatusBadRequest)
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	var payload passwordPayload
+	err := json.NewDecoder(r.Body).Decode(&payload)
+	if err != nil || payload.Password == "" {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(payload.Password), bcrypt.DefaultCost)
 	if err != nil {
 		http.Error(w, "Failed to hash password", http.StatusInternalServerError)
 		return
 	}
 
-	err = ioutil.WriteFile("password.hash", hashed, 0644)
+	conn := db.GetDB()
+	_, err = conn.Exec("DELETE FROM passwords")
 	if err != nil {
-		http.Error(w, "Failed to save password", http.StatusInternalServerError)
+		http.Error(w, "Failed to clear old password", http.StatusInternalServerError)
 		return
 	}
 
-	w.Write([]byte(`{"status":"password saved"}`))
+	_, err = conn.Exec("INSERT INTO passwords (password_hash) VALUES (?)", hashed)
+	if err != nil {
+		http.Error(w, "Failed to store password", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte(`{"status":"password saved in DB"}`))
 }
 
+// ✅ 비밀번호 확인
 func verifyPasswordHandler(w http.ResponseWriter, r *http.Request) {
-	password := r.URL.Query().Get("password")
-	if password == "" {
-		http.Error(w, "Password is required", http.StatusBadRequest)
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	hashed, err := ioutil.ReadFile("password.hash")
+	var payload passwordPayload
+	err := json.NewDecoder(r.Body).Decode(&payload)
+	if err != nil || payload.Password == "" {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	conn := db.GetDB()
+	row := conn.QueryRow("SELECT password_hash FROM passwords ORDER BY id DESC LIMIT 1")
+
+	var hashed string
+	err = row.Scan(&hashed)
 	if err != nil {
-		http.Error(w, "No saved password found", http.StatusNotFound)
+		http.Error(w, "No password found", http.StatusNotFound)
 		return
 	}
 
-	err = bcrypt.CompareHashAndPassword(hashed, []byte(password))
+	err = bcrypt.CompareHashAndPassword([]byte(hashed), []byte(payload.Password))
 	if err != nil {
 		http.Error(w, "Password mismatch", http.StatusUnauthorized)
 		return
@@ -232,16 +262,7 @@ func verifyPasswordHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"password match"}`))
 }
 
-// 비밀번호 해시 저장용 변수 (실제론 DB에 저장)
-var passwordHash []byte
-
-func storePasswordHandler(w http.ResponseWriter, r *http.Request) {
-	pw := r.URL.Query().Get("password")
-	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
-	passwordHash = hash
-	w.Write([]byte("Password saved"))
-}
-
+// ✅ 송금 가능 여부 확인
 func checkSendableHandler(w http.ResponseWriter, r *http.Request) {
 	to := C.CString(r.URL.Query().Get("to"))
 	amount := C.CString(r.URL.Query().Get("amount"))
@@ -259,6 +280,7 @@ func checkSendableHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// ✅ 실시간 가스비 정보 조회
 func getGasPriceHandler(w http.ResponseWriter, r *http.Request) {
 	gasPtr := C.get_gas_price()
 	defer C.free(unsafe.Pointer(gasPtr))
@@ -268,6 +290,7 @@ func getGasPriceHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(gasJson))
 }
 
+// ✅ 최근 트랜잭션 스캔 (Moralis)
 func scanTransactionsHandler(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	if address == "" {
@@ -275,7 +298,7 @@ func scanTransactionsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiKey := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImZiOTgwYzRlLWZjNjUtNDVhZi1hMTcyLTg0NTU4NGM5ZGJjMCIsIm9yZ0lkIjoiNDQ1MDgwIiwidXNlcklkIjoiNDU3OTMyIiwidHlwZUlkIjoiNzg5M2VjOTQtZDA5Yy00YWI3LTgwM2EtYzQ1YzMyMzdlNDExIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NDYyODEwMzgsImV4cCI6NDkwMjA0MTAzOH0.dSuxIQmJ-4yWQqba9-nYUz5RNOtVflmQLJR_WulLQ-8"
+	apiKey := os.Getenv("MORALIS_API_KEY")
 	url := fmt.Sprintf("https://deep-index.moralis.io/api/v2.2/%s?chain=amoy", address)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -295,7 +318,7 @@ func scanTransactionsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		http.Error(w, "Failed to read response", http.StatusInternalServerError)
 		return
@@ -310,6 +333,7 @@ func scanTransactionsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
+// ✅ 현재 네트워크 정보 조회
 func getNetworkInfoHandler(w http.ResponseWriter, r *http.Request) {
 	infoPtr := C.get_network_info()
 	defer C.free(unsafe.Pointer(infoPtr))
@@ -319,6 +343,7 @@ func getNetworkInfoHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(info))
 }
 
+// ✅ 상세 송금 가능 여부 반환
 func checkSendableDetailedHandler(w http.ResponseWriter, r *http.Request) {
 	to := C.CString(r.URL.Query().Get("to"))
 	amount := C.CString(r.URL.Query().Get("amount"))
@@ -338,6 +363,7 @@ func checkSendableDetailedHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(jsonResult))
 }
 
+// ✅ 트랜잭션 전송 및 주소 저장
 func sendTransactionHandler(w http.ResponseWriter, r *http.Request) {
 	to := r.URL.Query().Get("to")
 	amount := r.URL.Query().Get("amount")
@@ -366,6 +392,7 @@ func sendTransactionHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// ✅ 최근 주소 리스트 반환
 func getRecentAddressesHandler(w http.ResponseWriter, r *http.Request) {
 	conn := db.GetDB()
 	rows, err := conn.Query("SELECT address, last_used FROM recent_addresses ORDER BY last_used DESC LIMIT 10")
@@ -392,6 +419,92 @@ func getRecentAddressesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(addresses)
 }
 
+// ✅ QR코드 생성 핸들러
+func generateQRCodeHandler(w http.ResponseWriter, r *http.Request) {
+	address := r.URL.Query().Get("address")
+	if address == "" {
+		http.Error(w, "Missing address", http.StatusBadRequest)
+		return
+	}
+
+	png, err := qrcode.Encode(address, qrcode.Medium, 256)
+	if err != nil {
+		http.Error(w, "Failed to generate QR code", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+	w.Write(png)
+}
+
+// ✅ 주소 조회 핸들러
+func getAddressHandler(w http.ResponseWriter, r *http.Request) {
+	privateKey := r.URL.Query().Get("private_key")
+	if privateKey == "" {
+		http.Error(w, "Missing private_key", http.StatusBadRequest)
+		return
+	}
+
+	pkC := C.CString(privateKey)
+	defer C.free(unsafe.Pointer(pkC))
+
+	addrPtr := C.get_address_from_private_key(pkC)
+	defer C.free(unsafe.Pointer(addrPtr))
+
+	address := C.GoString(addrPtr)
+	json.NewEncoder(w).Encode(map[string]string{
+		"address": address,
+	})
+}
+
+// ✅ private key 생성 핸들러
+func generatePrivateKeyHandler(w http.ResponseWriter, r *http.Request) {
+	privPtr := C.generate_private_key()
+	defer C.free(unsafe.Pointer(privPtr))
+
+	privateKey := C.GoString(privPtr)
+	json.NewEncoder(w).Encode(map[string]string{
+		"private_key": privateKey,
+	})
+}
+
+// ✅ 등록된 외부 지갑 주소 목록 조회
+func getRegisteredWalletsHandler(w http.ResponseWriter, r *http.Request) {
+	conn := db.GetDB()
+	if conn == nil {
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	rows, err := conn.Query(`
+		SELECT address, label, registered_at 
+		FROM registered_wallets 
+		ORDER BY registered_at DESC
+	`)
+	if err != nil {
+		http.Error(w, "Failed to fetch wallets", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var wallets []map[string]string
+	for rows.Next() {
+		var address, label string
+		var registeredAt time.Time
+		if err := rows.Scan(&address, &label, &registeredAt); err != nil {
+			continue
+		}
+		wallets = append(wallets, map[string]string{
+			"address":       address,
+			"label":         label,
+			"registered_at": registeredAt.Format(time.RFC3339),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(wallets)
+}
+
 func main() {
 	db.InitDB()
 	http.HandleFunc("/wallets/create", generateMnemonicHandler)
@@ -404,13 +517,16 @@ func main() {
 	http.HandleFunc("/wallets/verify", verifyMnemonicHandler)
 	http.HandleFunc("/wallets/set-password", setPasswordHandler)
 	http.HandleFunc("/wallets/verify-password", verifyPasswordHandler)
-	http.HandleFunc("/auth/password", storePasswordHandler)
 	http.HandleFunc("/wallets/check", checkSendableHandler)
 	http.HandleFunc("/wallets/gas", getGasPriceHandler)
 	http.HandleFunc("/wallets/scan", scanTransactionsHandler)
 	http.HandleFunc("/wallets/network", getNetworkInfoHandler)
 	http.HandleFunc("/wallets/check-detailed", checkSendableDetailedHandler)
 	http.HandleFunc("/wallets/recent", getRecentAddressesHandler)
+	http.HandleFunc("/wallets/qrcode", generateQRCodeHandler)
+	http.HandleFunc("/wallets/from-address", getAddressHandler)
+	http.HandleFunc("/wallets/private-key", generatePrivateKeyHandler)
+	http.HandleFunc("/wallets/registered", getRegisteredWalletsHandler)
 
 	fmt.Println("🚀 Server running at http://localhost:8080")
 	http.ListenAndServe(":8080", nil)

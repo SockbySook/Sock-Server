@@ -13,7 +13,6 @@ var (
 	once sync.Once
 )
 
-// InitDB initializes the SQLite database and creates the recent_addresses table
 func InitDB() {
 	once.Do(func() {
 		var err error
@@ -22,23 +21,33 @@ func InitDB() {
 			log.Fatalf("❌ DB 연결 실패: %v", err)
 		}
 
-		createTable := `
+		// 최근 송금 주소 테이블 생성
+		createRecentAddressesTable := `
 		CREATE TABLE IF NOT EXISTS recent_addresses (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			address TEXT NOT NULL UNIQUE,
 			last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);`
-
-		_, err = db.Exec(createTable)
+		_, err = db.Exec(createRecentAddressesTable)
 		if err != nil {
-			log.Fatalf("❌ 테이블 생성 실패: %v", err)
+			log.Fatalf("❌ recent_addresses 테이블 생성 실패: %v", err)
 		}
-
 		log.Println("✅ recent_addresses 테이블 초기화 완료")
+
+		// 비밀번호 해시 저장 테이블 생성
+		createPasswordTable := `
+		CREATE TABLE IF NOT EXISTS passwords (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			password_hash TEXT NOT NULL
+		);`
+		_, err = db.Exec(createPasswordTable)
+		if err != nil {
+			log.Fatalf("❌ passwords 테이블 생성 실패: %v", err)
+		}
+		log.Println("✅ passwords 테이블 초기화 완료")
 	})
 }
 
-// GetDB returns the initialized DB instance
 func GetDB() *sql.DB {
 	if db == nil {
 		log.Fatal("❌ DB가 초기화되지 않았습니다. InitDB()를 먼저 호출하세요.")
