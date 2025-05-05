@@ -1,0 +1,22 @@
+[package]
+name = "rust_wallet"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+bip39 = "2.1"
+rand = "0.8"
+k256 = { version = "0.13", features = ["ecdsa"] }
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+hex = "0.4"
+generic-array = "0.14"
+typenum = "1.17"
+sha3 = "0.10.8"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+web3 = "0.19.0"
