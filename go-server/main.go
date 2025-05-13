@@ -3,7 +3,7 @@ package main
 /*
 #cgo CFLAGS: -I${SRCDIR}/..
 #cgo darwin LDFLAGS: -L${SRCDIR}/.. -lrust_wallet -framework SystemConfiguration -framework CoreFoundation
-#cgo linux  LDFLAGS: -L${SRCDIR}/.. -lrust_wallet
+#cgo linux  LDFLAGS: -L${SRCDIR}/.. -lrust_wallet -lssl -lcrypto
 #include <stdlib.h>
 #include <stdbool.h>
 #include "../rust_wallet.h"
