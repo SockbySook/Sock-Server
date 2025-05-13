@@ -16,7 +16,7 @@ jobs:
       - name: 🔐 Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/sm-deploy.pem
+          printf "%s\n" "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/sm-deploy.pem
           chmod 400 ~/.ssh/sm-deploy.pem
 
       - name: 🚚 Rsync Project to EC2
