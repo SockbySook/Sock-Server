@@ -2,7 +2,7 @@ package main
 
 /*
 #cgo pkg-config: openssl
-#cgo LDFLAGS: -L${SRCDIR}/.. -lrust_wallet -lz -ldl -lpthread
+#cgo LDFLAGS: -L${SRCDIR}/.. -lrust_wallet -lm -lz -ldl -lpthread
 #cgo CFLAGS: -I${SRCDIR}/..
 #include <stdlib.h>
 #include <stdbool.h>
