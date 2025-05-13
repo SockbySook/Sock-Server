@@ -21,12 +21,12 @@ jobs:
 
       - name: 🚚 Rsync Project to EC2
         run: |
-          rsync -avz -e "ssh -i ~/.ssh/sm-deploy.pem -o StrictHostKeyChecking=no" ./ ubuntu@43.201.26.30:/home/ubuntu/your-project
+          rsync -avz -e "ssh -i ~/.ssh/sm-deploy.pem -o StrictHostKeyChecking=no" ./ ubuntu@43.201.26.30:/home/ubuntu/Sock-Server
 
       - name: 🔄 Run Remote Deploy Script
         run: |
           ssh -i ~/.ssh/sm-deploy.pem -o StrictHostKeyChecking=no ubuntu@43.201.26.30 << 'EOF'
-            cd /home/ubuntu/your-project
+            cd /home/ubuntu/Sock-Server
             chmod +x deploy.sh
             ./deploy.sh
           EOF
