@@ -1,4 +1,4 @@
-name: 🚀 Deploy to EC2
+name: 🚀 Build and Deploy to EC2
 
 on:
   push:
@@ -13,20 +13,32 @@ jobs:
       - name: 📦 Checkout Repository
         uses: actions/checkout@v3
 
-      - name: 🔐 Setup SSH
+      - name: 🦀 Build Rust (FFI)
+        run: |
+          cd rust-wallet-lib
+          cargo build --release
+          cp target/release/librust_wallet.a ../
+
+      - name: 🛠️ Build Go Backend
+        run: |
+          cd go-server
+          go build -o myapp main.go
+
+      - name: 🔐 Setup SSH Key
         run: |
           mkdir -p ~/.ssh
           printf "%s\n" "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/sm-deploy.pem
           chmod 400 ~/.ssh/sm-deploy.pem
 
-      - name: 🚚 Rsync Project to EC2
+      - name: 🚚 Deploy binaries to EC2
         run: |
-          rsync -avz -e "ssh -i ~/.ssh/sm-deploy.pem -o StrictHostKeyChecking=no" ./ ubuntu@43.201.26.30:/home/ubuntu/Sock-Server
+          rsync -avz -e "ssh -i ~/.ssh/sm-deploy.pem -o StrictHostKeyChecking=no" \
+            ./librust_wallet.a ./go-server/myapp \
+            ubuntu@43.201.26.30:/home/ubuntu/Sock-Server/
 
-      - name: 🔄 Run Remote Deploy Script
+      - name: 🔄 (Optional) Restart service on EC2
         run: |
           ssh -i ~/.ssh/sm-deploy.pem -o StrictHostKeyChecking=no ubuntu@43.201.26.30 << 'EOF'
-            cd /home/ubuntu/Sock-Server
-            chmod +x deploy.sh
-            ./deploy.sh
+            chmod +x /home/ubuntu/Sock-Server/myapp
+            # ./myapp or sudo systemctl restart myapp.service
           EOF
