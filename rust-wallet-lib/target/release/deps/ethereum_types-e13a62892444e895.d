@@ -1,9 +1,0 @@
-/Users/leeseohyun02/Desktop/project/Sock-Server/rust-wallet-lib/target/release/deps/libethereum_types-e13a62892444e895.rmeta: /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethereum-types-0.14.1/src/lib.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethereum-types-0.14.1/src/hash.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethereum-types-0.14.1/src/uint.rs
-
-/Users/leeseohyun02/Desktop/project/Sock-Server/rust-wallet-lib/target/release/deps/libethereum_types-e13a62892444e895.rlib: /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethereum-types-0.14.1/src/lib.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethereum-types-0.14.1/src/hash.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethereum-types-0.14.1/src/uint.rs
-
-/Users/leeseohyun02/Desktop/project/Sock-Server/rust-wallet-lib/target/release/deps/ethereum_types-e13a62892444e895.d: /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethereum-types-0.14.1/src/lib.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethereum-types-0.14.1/src/hash.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethereum-types-0.14.1/src/uint.rs
-
-/Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethereum-types-0.14.1/src/lib.rs:
-/Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethereum-types-0.14.1/src/hash.rs:
-/Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ethereum-types-0.14.1/src/uint.rs:

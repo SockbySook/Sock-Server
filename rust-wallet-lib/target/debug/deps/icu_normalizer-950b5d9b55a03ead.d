@@ -1,9 +1,0 @@
-/Users/leeseohyun02/Desktop/project/Sock-Server/rust-wallet-lib/target/debug/deps/libicu_normalizer-950b5d9b55a03ead.rmeta: /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/lib.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/error.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/properties.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/provider.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/uts46.rs
-
-/Users/leeseohyun02/Desktop/project/Sock-Server/rust-wallet-lib/target/debug/deps/icu_normalizer-950b5d9b55a03ead.d: /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/lib.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/error.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/properties.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/provider.rs /Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/uts46.rs
-
-/Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/lib.rs:
-/Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/error.rs:
-/Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/properties.rs:
-/Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/provider.rs:
-/Users/leeseohyun02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/icu_normalizer-1.5.0/src/uts46.rs:
