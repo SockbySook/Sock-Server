@@ -1,0 +1,32 @@
+name: 🚀 Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: 🔐 Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/sm-deploy.pem
+          chmod 400 ~/.ssh/sm-deploy.pem
+
+      - name: 🚚 Rsync Project to EC2
+        run: |
+          rsync -avz -e "ssh -i ~/.ssh/sm-deploy.pem -o StrictHostKeyChecking=no" ./ ubuntu@43.201.26.30:/home/ubuntu/your-project
+
+      - name: 🔄 Run Remote Deploy Script
+        run: |
+          ssh -i ~/.ssh/sm-deploy.pem -o StrictHostKeyChecking=no ubuntu@43.201.26.30 << 'EOF'
+            cd /home/ubuntu/your-project
+            chmod +x deploy.sh
+            ./deploy.sh
+          EOF
