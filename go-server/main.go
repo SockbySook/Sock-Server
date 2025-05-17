@@ -1,9 +1,8 @@
 package main
 
 /*
-#cgo pkg-config: openssl
 #cgo darwin LDFLAGS: -framework CoreFoundation -framework SystemConfiguration
-#cgo LDFLAGS: -L${SRCDIR}/.. -lrust_wallet -lm -lz -ldl -lpthread -framework CoreFoundation -framework SystemConfiguration
+#cgo LDFLAGS: -L${SRCDIR}/.. -lrust_wallet -lm -lz -ldl -lpthread
 #cgo CFLAGS: -I${SRCDIR}/..
 #include <stdlib.h>
 #include <stdbool.h>
