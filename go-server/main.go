@@ -514,6 +514,7 @@ func main() {
 		log.Println("⚠️ .env 파일을 로드하지 못했습니다:", err)
 	} else {
 		log.Println("✅ .env 파일 로드 성공")
+		log.Println("🔑 MORALIS_API_KEY =", os.Getenv("MORALIS_API_KEY"))
 	}
 	db.InitDB()
 	http.HandleFunc("/wallets/create", generateMnemonicHandler)
