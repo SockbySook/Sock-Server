@@ -1,7 +1,7 @@
-#include <cstdarg>
-#include <cstdint>
-#include <cstdlib>
-#include <ostream>
+#include <stdarg.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdbool.h>
 #include <new>
 
 extern "C" {
