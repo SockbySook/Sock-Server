@@ -124,8 +124,8 @@ func getTxHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(resp.Body)
 
 	if resp.StatusCode != 200 {
-		fmt.Println("❌ Moralis API error:", string(body))
-		http.Error(w, "Failed to fetch transactions", resp.StatusCode)
+		log.Printf("❌ Moralis API error: status=%d, body=%s", resp.StatusCode, body)
+		http.Error(w, string(body), resp.StatusCode)
 		return
 	}
 
