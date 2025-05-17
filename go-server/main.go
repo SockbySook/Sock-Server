@@ -6,8 +6,9 @@ package main
 #cgo CFLAGS: -I${SRCDIR}/..
 #include <stdlib.h>
 #include <stdbool.h>
-#include "../rust_wallet.h"
+#include "rust_wallet.h"
 */
+
 import "C"
 
 import (
