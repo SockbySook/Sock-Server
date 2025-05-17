@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"go-server/db"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -102,6 +101,12 @@ func getTxHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	apiKey := os.Getenv("MORALIS_API_KEY")
+	if apiKey == "" {
+		log.Println("❌ MORALIS_API_KEY is not set")
+		http.Error(w, `{"error": "MORALIS_API_KEY is not set on the server"}`, http.StatusInternalServerError)
+		return
+	}
+
 	url := fmt.Sprintf("https://deep-index.moralis.io/api/v2/%s?chain=amoy", address)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -121,7 +126,11 @@ func getTxHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Failed to read Moralis response", http.StatusInternalServerError)
+		return
+	}
 
 	if resp.StatusCode != 200 {
 		log.Printf("❌ Moralis API error: status=%d, body=%s", resp.StatusCode, body)
