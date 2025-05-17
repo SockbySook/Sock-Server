@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/skip2/go-qrcode"
 	"golang.org/x/crypto/bcrypt"
 
@@ -508,6 +509,12 @@ func getRegisteredWalletsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("⚠️ .env 파일을 로드하지 못했습니다:", err)
+	} else {
+		log.Println("✅ .env 파일 로드 성공")
+	}
 	db.InitDB()
 	http.HandleFunc("/wallets/create", generateMnemonicHandler)
 	http.HandleFunc("/wallets/address", generateAddressHandler)
