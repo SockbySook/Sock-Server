@@ -548,5 +548,10 @@ func main() {
 	http.HandleFunc("/wallets/registered", getRegisteredWalletsHandler)
 
 	fmt.Println("🚀 Server running at http://localhost:8080")
-	log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
+	log.Println("🚀 Server running at http://localhost:8080")
+	err = http.ListenAndServe("0.0.0.0:8080", nil)
+	if err != nil {
+		log.Fatalf("❌ 서버 시작 실패: %v", err)
+	}
+	//log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
 }
