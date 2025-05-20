@@ -547,7 +547,6 @@ func main() {
 	http.HandleFunc("/wallets/private-key", generatePrivateKeyHandler)
 	http.HandleFunc("/wallets/registered", getRegisteredWalletsHandler)
 
-	fmt.Println("🚀 Server running at http://localhost:8080")
 	log.Println("🚀 Server running at http://localhost:8080")
 	err = http.ListenAndServe("0.0.0.0:8080", nil)
 	if err != nil {
