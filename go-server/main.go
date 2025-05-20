@@ -84,13 +84,22 @@ func getBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	addrC := C.CString(address)
 	defer C.free(unsafe.Pointer(addrC))
 
+	// 	resultPtr := C.get_balance_by_address(addrC)
+	// 	defer C.free(unsafe.Pointer(resultPtr))
+
+	// 	balance := C.GoString(resultPtr)
+	// 	resp := map[string]string{"balance": balance + " ETH"}
+	// 	json.NewEncoder(w).Encode(resp)
 	resultPtr := C.get_balance_by_address(addrC)
 	defer C.free(unsafe.Pointer(resultPtr))
 
-	balance := C.GoString(resultPtr)
-	resp := map[string]string{"balance": balance + " ETH"}
-	json.NewEncoder(w).Encode(resp)
+	balanceJson := C.GoString(resultPtr)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(balanceJson))
 }
+
+// }
 
 // ✅ 거래 내역(Moralis API) 가져오기
 func getTxHistoryHandler(w http.ResponseWriter, r *http.Request) {
@@ -294,7 +303,7 @@ func checkSendableHandler(w http.ResponseWriter, r *http.Request) {
 
 // ✅ 실시간 가스비 정보 조회
 func getGasPriceHandler(w http.ResponseWriter, r *http.Request) {
-	gasPtr := C.get_gas_price()
+	gasPtr := C.get_gas_price_amoy()
 	defer C.free(unsafe.Pointer(gasPtr))
 
 	gasJson := C.GoString(gasPtr)

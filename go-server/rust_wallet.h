@@ -1,0 +1,1 @@
+../rust-wallet-lib/rust_wallet.h

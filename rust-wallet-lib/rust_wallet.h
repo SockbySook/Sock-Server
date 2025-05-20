@@ -24,6 +24,8 @@ char *get_network_info(void);
 char *check_sendable_detailed(const char *to, const char *amount, const char *private_key);
 char *get_address_from_private_key(const char *pk_ptr);
 char *generate_private_key(void);
+char* get_gas_price_amoy(void);
+
 
 #ifdef __cplusplus
 }

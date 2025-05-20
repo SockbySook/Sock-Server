@@ -264,54 +264,85 @@ pub extern "C" fn check_sendable(to: *const c_char, amount: *const c_char, priva
     matches!(result, Ok(true))
 }
 
-/// ✅ 이더스캔 API를 통한 가스비 정보 조회
+// /// ✅ 이더스캔 API를 통한 가스비 정보 조회
+// #[no_mangle]
+// pub extern "C" fn get_gas_price() -> *mut c_char {
+//     use reqwest::blocking::Client;
+//     use serde::Deserialize;
+
+//     #[derive(Deserialize)]
+//     struct GasOracleResponse {
+//         status: String,
+//         message: String,
+//         result: GasOracleResult,
+//     }
+
+//     #[derive(Deserialize)]
+//     struct GasOracleResult {
+//         SafeGasPrice: String,
+//         ProposeGasPrice: String,
+//         FastGasPrice: String,
+//         suggestBaseFee: String,
+//         gasUsedRatio: String,
+//     }
+
+//     let api_key = std::env::var("ETHERSCAN_API_KEY").unwrap_or_else(|_| "".to_string());
+//     let url = format!("https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey={}", api_key);
+
+//     let client = Client::new();
+//     let response = client.get(&url).send();
+
+//     match response {
+//         Ok(resp) => {
+//             match resp.json::<GasOracleResponse>() {
+//                 Ok(parsed) => {
+//                     let gas_info = format!(
+//                         "{{\"SafeGasPrice\": \"{}\", \"ProposeGasPrice\": \"{}\", \"FastGasPrice\": \"{}\", \"suggestBaseFee\": \"{}\", \"gasUsedRatio\": \"{}\"}}",
+//                         parsed.result.SafeGasPrice,
+//                         parsed.result.ProposeGasPrice,
+//                         parsed.result.FastGasPrice,
+//                         parsed.result.suggestBaseFee,
+//                         parsed.result.gasUsedRatio
+//                     );
+//                     CString::new(gas_info).unwrap().into_raw()
+//                 },
+//                 Err(_) => CString::new("Failed to parse gas price response").unwrap().into_raw(),
+//             }
+//         },
+//         Err(_) => CString::new("Gas price request failed").unwrap().into_raw(),
+//     }
+// }
+
+/// ✅ Polygon Amoy 네트워크의 실시간 가스비를 조회 (RPC 기반)
 #[no_mangle]
-pub extern "C" fn get_gas_price() -> *mut c_char {
-    use reqwest::blocking::Client;
-    use serde::Deserialize;
+pub extern "C" fn get_gas_price_amoy() -> *mut c_char {
+    use web3::transports::Http;
+    use web3::types::U256;
+    use std::ffi::CString;
+    use tokio::runtime::Runtime;
 
-    #[derive(Deserialize)]
-    struct GasOracleResponse {
-        status: String,
-        message: String,
-        result: GasOracleResult,
-    }
+    let rpc_url = "https://rpc-amoy.polygon.technology";
 
-    #[derive(Deserialize)]
-    struct GasOracleResult {
-        SafeGasPrice: String,
-        ProposeGasPrice: String,
-        FastGasPrice: String,
-        suggestBaseFee: String,
-        gasUsedRatio: String,
-    }
+    let rt = Runtime::new().unwrap();
+    let result = rt.block_on(async {
+        let transport = Http::new(rpc_url).unwrap();
+        let web3 = web3::Web3::new(transport);
 
-    let api_key = std::env::var("ETHERSCAN_API_KEY").unwrap_or_else(|_| "".to_string());
-    let url = format!("https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey={}", api_key);
-
-    let client = Client::new();
-    let response = client.get(&url).send();
-
-    match response {
-        Ok(resp) => {
-            match resp.json::<GasOracleResponse>() {
-                Ok(parsed) => {
-                    let gas_info = format!(
-                        "{{\"SafeGasPrice\": \"{}\", \"ProposeGasPrice\": \"{}\", \"FastGasPrice\": \"{}\", \"suggestBaseFee\": \"{}\", \"gasUsedRatio\": \"{}\"}}",
-                        parsed.result.SafeGasPrice,
-                        parsed.result.ProposeGasPrice,
-                        parsed.result.FastGasPrice,
-                        parsed.result.suggestBaseFee,
-                        parsed.result.gasUsedRatio
-                    );
-                    CString::new(gas_info).unwrap().into_raw()
-                },
-                Err(_) => CString::new("Failed to parse gas price response").unwrap().into_raw(),
+        match web3.eth().gas_price().await {
+            Ok(gas_price) => {
+                let gwei = gas_price / U256::exp10(9); // Wei → Gwei 변환
+                format!("{{\"gas_price_wei\": \"{}\", \"gas_price_gwei\": \"{}\", \"network\": \"polygon-amoy\"}}",
+                        gas_price, gwei)
             }
-        },
-        Err(_) => CString::new("Gas price request failed").unwrap().into_raw(),
-    }
+            Err(_) => {
+                "{\"error\": \"Failed to fetch gas price from Polygon Amoy\"}".to_string()
+            }
+        }
+    });
+
+    CString::new(result).unwrap().into_raw()
 }
+
 
 /// ✅ 현재 네트워크 정보 조회
 #[no_mangle]
