@@ -26,10 +26,74 @@ import (
 
 	//"os"
 	"unsafe"
+
+	// 👇 Swagger UI 핸들러 및 문서 임포트
+	_ "go-server/docs"
+
+	httpSwagger "github.com/swaggo/http-swagger"
 )
+
+// ✅ 리팩토링: 공통 에러 응답 함수
+func respondWithError(w http.ResponseWriter, code int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+// ✅ 리팩토링: 공통 JSON 응답 함수
+func respondWithJSON(w http.ResponseWriter, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(data)
+}
 
 type passwordPayload struct {
 	Password string `json:"password"`
+}
+
+type MnemonicResponse struct {
+	Mnemonic string `json:"mnemonic"`
+}
+
+type AddressResponse struct {
+	Address string `json:"address"`
+}
+
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+type BalanceResponse struct {
+	Balance string `json:"balance"`
+	Symbol  string `json:"symbol"`
+	Network string `json:"network"`
+}
+
+type RecoverResponse struct {
+	Address    string `json:"address"`
+	PrivateKey string `json:"privatekey"`
+}
+
+type SendableResponse struct {
+	CanSend bool `json:"cansend"`
+}
+
+type TransactionResponse struct {
+	TxHash string `json:"txhash"`
+}
+
+type PasswordStatusResponse struct {
+	Status string `json:"status"`
+}
+
+type RecentAddress struct {
+	Address  string `json:"address"`
+	LastUsed string `json:"lastused"`
+}
+
+type RegisteredWallet struct {
+	Address      string `json:"address"`
+	Label        string `json:"label"`
+	RegisteredAt string `json:"registeredat"`
 }
 
 // ✅ 최근 송금 주소를 DB에 저장
@@ -54,65 +118,90 @@ func saveRecentAddress(address string) {
 }
 
 // ✅ 니모닉 생성
+// generateMnemonicHandler godoc
+// @Summary     니모닉 생성
+// @Description 24개 단어의 니모닉을 생성합니다. 🔁 내부적으로 Rust FFI 사용
+// @Tags        Wallet
+// @Accept      json
+// @Produce     json
+// @Success     200 {object} MnemonicResponse
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/create [get]
 func generateMnemonicHandler(w http.ResponseWriter, r *http.Request) {
 	mnemonicPtr := C.generate_mnemonic()
 	mnemonic := C.GoString(mnemonicPtr)
 	C.free(unsafe.Pointer(mnemonicPtr))
 
-	resp := map[string]string{"mnemonic": mnemonic}
-	json.NewEncoder(w).Encode(resp)
+	respondWithJSON(w, map[string]string{"mnemonic": mnemonic})
 }
 
 // ✅ 새로운 지갑 주소 생성
+// generateAddressHandler godoc
+// @Summary     지갑 주소 생성
+// @Description 랜덤한 새로운 지갑 주소를 생성합니다. 🔁 내부적으로 Rust FFI 사용
+// @Tags        Wallet
+// @Accept      json
+// @Produce     json
+// @Success     200 {object} AddressResponse
+// @Failure     500 {object} ErrorResponse
+// @Router      /wallets/address [get]
 func generateAddressHandler(w http.ResponseWriter, r *http.Request) {
 	addrPtr := C.generate_address()
 	address := C.GoString(addrPtr)
 	C.free(unsafe.Pointer(addrPtr))
 
-	resp := map[string]string{"address": address}
-	json.NewEncoder(w).Encode(resp)
+	respondWithJSON(w, map[string]string{"address": address})
 }
 
 // ✅ 현재 지갑 잔액 조회
+// getBalanceHandler godoc
+// @Summary     잔액 조회
+// @Description 지갑 주소의 잔액을 조회합니다. 🔁 내부적으로 Rust FFI 사용
+// @Tags        Wallet
+// @Accept      json
+// @Produce     json
+// @Param       address query string true "지갑 주소"
+// @Success     200 {object} BalanceResponse
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/balance [get]
 func getBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	if address == "" {
-		http.Error(w, "Missing address parameter", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Missing address parameter")
 		return
 	}
 
 	addrC := C.CString(address)
 	defer C.free(unsafe.Pointer(addrC))
 
-	// 	resultPtr := C.get_balance_by_address(addrC)
-	// 	defer C.free(unsafe.Pointer(resultPtr))
-
-	// 	balance := C.GoString(resultPtr)
-	// 	resp := map[string]string{"balance": balance + " ETH"}
-	// 	json.NewEncoder(w).Encode(resp)
 	resultPtr := C.get_balance_by_address(addrC)
 	defer C.free(unsafe.Pointer(resultPtr))
 
 	balanceJson := C.GoString(resultPtr)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(balanceJson))
+	respondWithJSON(w, json.RawMessage(balanceJson))
 }
 
-// }
-
 // ✅ 거래 내역(Moralis API) 가져오기
+// getTxHistoryHandler godoc
+// @Summary     거래 내역 조회 (Go)
+// @Description Moralis API를 통해 거래 내역을 조회합니다. 🔁 내부적으로 Rust FFI 사용
+// @Tags        Wallet
+// @Accept      json
+// @Produce     json
+// @Param       address query string true "지갑 주소"
+// @Success     200 {object} map[string]interface{}
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/history/go [get]
 func getTxHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	if address == "" {
-		http.Error(w, "Missing address parameter", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Missing address parameter")
 		return
 	}
 
 	apiKey := os.Getenv("MORALIS_API_KEY")
 	if apiKey == "" {
-		log.Println("❌ MORALIS_API_KEY is not set")
-		http.Error(w, `{"error": "MORALIS_API_KEY is not set on the server"}`, http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "MORALIS_API_KEY is not set on the server")
 		return
 	}
 
@@ -120,7 +209,7 @@ func getTxHistoryHandler(w http.ResponseWriter, r *http.Request) {
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		http.Error(w, "Failed to create request", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to create request")
 		return
 	}
 
@@ -152,6 +241,16 @@ func getTxHistoryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ FFI 기반 거래 내역 조회
+// getHistoryHandler godoc
+// @Summary     거래 내역 조회 (Rust)
+// @Description Rust FFI를 통해 거래 내역을 조회합니다. 🔁 내부적으로 Rust FFI 사용
+// @Tags        Wallet
+// @Accept      json
+// @Produce     json
+// @Param       address query string true "지갑 주소"
+// @Success     200 {object} map[string]interface{}
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/history/ffi [get]
 func getHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	if address == "" {
@@ -171,6 +270,16 @@ func getHistoryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 니모닉 기반 지갑 복구
+// recoverWalletHandler godoc
+// @Summary     지갑 복구
+// @Description 니모닉으로 지갑을 복구합니다. 🔁 내부적으로 Rust FFI 사용
+// @Tags        Wallet
+// @Accept      json
+// @Produce     json
+// @Param       mnemonic query string true "니모닉 24단어"
+// @Success     200 {object} RecoverResponse
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/recover [get]
 func recoverWalletHandler(w http.ResponseWriter, r *http.Request) {
 	mnemonic := r.URL.Query().Get("mnemonic")
 	if mnemonic == "" {
@@ -198,6 +307,16 @@ func recoverWalletHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 니모닉 유효성 검증
+// verifyMnemonicHandler godoc
+// @Summary     니모닉 유효성 확인
+// @Description 입력한 니모닉의 유효성을 검증합니다. 🔁 내부적으로 Rust FFI 사용
+// @Tags        Wallet
+// @Accept      json
+// @Produce     json
+// @Param       mnemonic query string true "니모닉 24단어"
+// @Success     200 {object} map[string]bool
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/verify [get]
 func verifyMnemonicHandler(w http.ResponseWriter, r *http.Request) {
 	mnemonic := r.URL.Query().Get("mnemonic")
 	if mnemonic == "" {
@@ -215,6 +334,16 @@ func verifyMnemonicHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 비밀번호 저장
+// setPasswordHandler godoc
+// @Summary     비밀번호 저장
+// @Description 비밀번호를 해시화하여 DB에 저장합니다.
+// @Tags        Auth
+// @Accept      json
+// @Produce     json
+// @Param       payload body map[string]string true "비밀번호 페이로드 (예: {\"password\": \"1234\"})"
+// @Success     200 {object} PasswordStatusResponse
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/set-password [post]
 func setPasswordHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -251,6 +380,16 @@ func setPasswordHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 비밀번호 확인
+// verifyPasswordHandler godoc
+// @Summary     비밀번호 검증
+// @Description 저장된 비밀번호 해시와 비교하여 일치 여부를 확인합니다.
+// @Tags        Auth
+// @Accept      json
+// @Produce     json
+// @Param       payload body map[string]string true "비밀번호 페이로드"
+// @Success     200 {object} PasswordStatusResponse
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/verify-password [post]
 func verifyPasswordHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -284,6 +423,18 @@ func verifyPasswordHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 송금 가능 여부 확인
+// checkSendableHandler godoc
+// @Summary     송금 가능 여부
+// @Description 입력한 주소/금액/개인키 기준으로 잔액이 충분한지 여부를 반환합니다.
+// @Tags        Transaction
+// @Accept      json
+// @Produce     json
+// @Param       to query string true "받는 주소"
+// @Param       amount query string true "금액"
+// @Param       private_key query string true "개인키"
+// @Success     200 {object} SendableResponse
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/check [get]
 func checkSendableHandler(w http.ResponseWriter, r *http.Request) {
 	to := C.CString(r.URL.Query().Get("to"))
 	amount := C.CString(r.URL.Query().Get("amount"))
@@ -302,6 +453,15 @@ func checkSendableHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 실시간 가스비 정보 조회
+// getGasPriceHandler godoc
+// @Summary     가스비 조회
+// @Description Polygon Amoy 네트워크의 현재 가스비를 반환합니다.
+// @Tags        Network
+// @Accept      json
+// @Produce     json
+// @Success     200 {object} map[string]string
+// @Failure     500 {object} ErrorResponse
+// @Router      /wallets/gas [get]
 func getGasPriceHandler(w http.ResponseWriter, r *http.Request) {
 	gasPtr := C.get_gas_price_amoy()
 	defer C.free(unsafe.Pointer(gasPtr))
@@ -312,6 +472,16 @@ func getGasPriceHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 최근 트랜잭션 스캔 (Moralis)
+// scanTransactionsHandler godoc
+// @Summary     최근 트랜잭션 스캔
+// @Description Moralis API를 통해 최근 트랜잭션 내역을 조회합니다.
+// @Tags        Transaction
+// @Accept      json
+// @Produce     json
+// @Param       address query string true "지갑 주소"
+// @Success     200 {object} map[string]interface{}
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/scan [get]
 func scanTransactionsHandler(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	if address == "" {
@@ -355,6 +525,15 @@ func scanTransactionsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 현재 네트워크 정보 조회
+// getNetworkInfoHandler godoc
+// @Summary     네트워크 정보
+// @Description 현재 연결된 Polygon Amoy 네트워크의 체인 ID와 블록 번호를 반환합니다.
+// @Tags        Network
+// @Accept      json
+// @Produce     json
+// @Success     200 {object} map[string]interface{}
+// @Failure     500 {object} ErrorResponse
+// @Router      /wallets/network [get]
 func getNetworkInfoHandler(w http.ResponseWriter, r *http.Request) {
 	infoPtr := C.get_network_info()
 	defer C.free(unsafe.Pointer(infoPtr))
@@ -365,6 +544,18 @@ func getNetworkInfoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 상세 송금 가능 여부 반환
+// checkSendableDetailedHandler godoc
+// @Summary     송금 가능 여부 상세
+// @Description 필요한 금액, 가스비, 현재 잔액 등 송금 가능 조건을 상세하게 제공합니다.
+// @Tags        Transaction
+// @Accept      json
+// @Produce     json
+// @Param       to query string true "받는 주소"
+// @Param       amount query string true "금액"
+// @Param       private_key query string true "개인키"
+// @Success     200 {object} map[string]interface{}
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/check-detailed [get]
 func checkSendableDetailedHandler(w http.ResponseWriter, r *http.Request) {
 	to := C.CString(r.URL.Query().Get("to"))
 	amount := C.CString(r.URL.Query().Get("amount"))
@@ -385,6 +576,18 @@ func checkSendableDetailedHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 트랜잭션 전송 및 주소 저장
+// sendTransactionHandler godoc
+// @Summary     트랜잭션 전송
+// @Description MATIC을 송금합니다. 🔁 내부적으로 Rust FFI 사용
+// @Tags        Wallet
+// @Accept      json
+// @Produce     json
+// @Param       to query string true "받는 주소"
+// @Param       amount query string true "금액 (MATIC)"
+// @Param       private_key query string true "보내는 사람의 개인키"
+// @Success     200 {object} TransactionResponse
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/send [get]
 func sendTransactionHandler(w http.ResponseWriter, r *http.Request) {
 	to := r.URL.Query().Get("to")
 	amount := r.URL.Query().Get("amount")
@@ -414,6 +617,15 @@ func sendTransactionHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 최근 주소 리스트 반환
+// getRecentAddressesHandler godoc
+// @Summary     최근 송금 주소 조회
+// @Description 최근에 송금한 주소 목록을 시간 순으로 반환합니다.
+// @Tags        Wallet
+// @Accept      json
+// @Produce     json
+// @Success     200 {object} []RecentAddress
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/recent [get]
 func getRecentAddressesHandler(w http.ResponseWriter, r *http.Request) {
 	conn := db.GetDB()
 	rows, err := conn.Query("SELECT address, last_used FROM recent_addresses ORDER BY last_used DESC LIMIT 10")
@@ -441,6 +653,16 @@ func getRecentAddressesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ QR코드 생성 핸들러
+// generateQRCodeHandler godoc
+// @Summary     QR코드 생성
+// @Description 입력된 주소에 대한 QR코드를 이미지로 반환합니다.
+// @Tags        Wallet
+// @Accept      json
+// @Produce     image/png
+// @Param       address query string true "주소"
+// @Success     200 {string} binary
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/qrcode [get]
 func generateQRCodeHandler(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	if address == "" {
@@ -459,6 +681,16 @@ func generateQRCodeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 주소 조회 핸들러
+// getAddressHandler godoc
+// @Summary     주소 조회
+// @Description 개인키로부터 지갑 주소를 반환합니다.
+// @Tags        Wallet
+// @Accept      json
+// @Produce     json
+// @Param       private_key query string true "개인키"
+// @Success     200 {object} AddressResponse
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/from-address [get]
 func getAddressHandler(w http.ResponseWriter, r *http.Request) {
 	privateKey := r.URL.Query().Get("private_key")
 	if privateKey == "" {
@@ -479,6 +711,15 @@ func getAddressHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ private key 생성 핸들러
+// generatePrivateKeyHandler godoc
+// @Summary     개인키 생성
+// @Description 새로운 개인키를 생성합니다.
+// @Tags        Wallet
+// @Accept      json
+// @Produce     json
+// @Success     200 {object} map[string]string
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/private-key [get]
 func generatePrivateKeyHandler(w http.ResponseWriter, r *http.Request) {
 	privPtr := C.generate_private_key()
 	defer C.free(unsafe.Pointer(privPtr))
@@ -490,6 +731,15 @@ func generatePrivateKeyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ✅ 등록된 외부 지갑 주소 목록 조회
+// getRegisteredWalletsHandler godoc
+// @Summary     등록된 외부 지갑 조회
+// @Description 외부 지갑 주소와 라벨 목록을 반환합니다.
+// @Tags        Wallet
+// @Accept      json
+// @Produce     json
+// @Success     200 {object} []RegisteredWallet
+// @Failure     400 {object} ErrorResponse
+// @Router      /wallets/registered [get]
 func getRegisteredWalletsHandler(w http.ResponseWriter, r *http.Request) {
 	conn := db.GetDB()
 	if conn == nil {
@@ -526,15 +776,8 @@ func getRegisteredWalletsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(wallets)
 }
 
-func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("⚠️ .env 파일을 로드하지 못했습니다:", err)
-	} else {
-		log.Println("✅ .env 파일 로드 성공")
-		log.Println("🔑 MORALIS_API_KEY =", os.Getenv("MORALIS_API_KEY"))
-	}
-	db.InitDB()
+// ✅ 리팩토링: 핸들러 등록 함수 분리
+func registerHandlers() {
 	http.HandleFunc("/wallets/create", generateMnemonicHandler)
 	http.HandleFunc("/wallets/address", generateAddressHandler)
 	http.HandleFunc("/wallets/balance", getBalanceHandler)
@@ -555,11 +798,25 @@ func main() {
 	http.HandleFunc("/wallets/from-address", getAddressHandler)
 	http.HandleFunc("/wallets/private-key", generatePrivateKeyHandler)
 	http.HandleFunc("/wallets/registered", getRegisteredWalletsHandler)
+	http.Handle("/swagger/", httpSwagger.WrapHandler)
+}
+
+// ✅ 리팩토링: main 함수 간결화
+func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("⚠️ .env 파일을 로드하지 못했습니다:", err)
+	} else {
+		log.Println("✅ .env 파일 로드 성공")
+		log.Println("🔑 MORALIS_API_KEY =", os.Getenv("MORALIS_API_KEY"))
+	}
+
+	db.InitDB()
+	registerHandlers()
 
 	log.Println("🚀 Server running at http://localhost:8080")
 	err = http.ListenAndServe("0.0.0.0:8080", nil)
 	if err != nil {
 		log.Fatalf("❌ 서버 시작 실패: %v", err)
 	}
-	//log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
 }

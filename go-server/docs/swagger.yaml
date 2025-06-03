@@ -1,0 +1,576 @@
+definitions:
+  main.AddressResponse:
+    properties:
+      address:
+        type: string
+    type: object
+  main.BalanceResponse:
+    properties:
+      balance:
+        type: string
+      network:
+        type: string
+      symbol:
+        type: string
+    type: object
+  main.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  main.MnemonicResponse:
+    properties:
+      mnemonic:
+        type: string
+    type: object
+  main.PasswordStatusResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  main.RecentAddress:
+    properties:
+      address:
+        type: string
+      lastused:
+        type: string
+    type: object
+  main.RecoverResponse:
+    properties:
+      address:
+        type: string
+      privatekey:
+        type: string
+    type: object
+  main.RegisteredWallet:
+    properties:
+      address:
+        type: string
+      label:
+        type: string
+      registeredat:
+        type: string
+    type: object
+  main.SendableResponse:
+    properties:
+      cansend:
+        type: boolean
+    type: object
+  main.TransactionResponse:
+    properties:
+      txhash:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /wallets/address:
+    get:
+      consumes:
+      - application/json
+      description: "랜덤한 새로운 지갑 주소를 생성합니다. \U0001F501 내부적으로 Rust FFI 사용"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.AddressResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 지갑 주소 생성
+      tags:
+      - Wallet
+  /wallets/balance:
+    get:
+      consumes:
+      - application/json
+      description: "지갑 주소의 잔액을 조회합니다. \U0001F501 내부적으로 Rust FFI 사용"
+      parameters:
+      - description: 지갑 주소
+        in: query
+        name: address
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.BalanceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 잔액 조회
+      tags:
+      - Wallet
+  /wallets/check:
+    get:
+      consumes:
+      - application/json
+      description: 입력한 주소/금액/개인키 기준으로 잔액이 충분한지 여부를 반환합니다.
+      parameters:
+      - description: 받는 주소
+        in: query
+        name: to
+        required: true
+        type: string
+      - description: 금액
+        in: query
+        name: amount
+        required: true
+        type: string
+      - description: 개인키
+        in: query
+        name: private_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.SendableResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 송금 가능 여부
+      tags:
+      - Transaction
+  /wallets/check-detailed:
+    get:
+      consumes:
+      - application/json
+      description: 필요한 금액, 가스비, 현재 잔액 등 송금 가능 조건을 상세하게 제공합니다.
+      parameters:
+      - description: 받는 주소
+        in: query
+        name: to
+        required: true
+        type: string
+      - description: 금액
+        in: query
+        name: amount
+        required: true
+        type: string
+      - description: 개인키
+        in: query
+        name: private_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 송금 가능 여부 상세
+      tags:
+      - Transaction
+  /wallets/create:
+    get:
+      consumes:
+      - application/json
+      description: "24개 단어의 니모닉을 생성합니다. \U0001F501 내부적으로 Rust FFI 사용"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.MnemonicResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 니모닉 생성
+      tags:
+      - Wallet
+  /wallets/from-address:
+    get:
+      consumes:
+      - application/json
+      description: 개인키로부터 지갑 주소를 반환합니다.
+      parameters:
+      - description: 개인키
+        in: query
+        name: private_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.AddressResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 주소 조회
+      tags:
+      - Wallet
+  /wallets/gas:
+    get:
+      consumes:
+      - application/json
+      description: Polygon Amoy 네트워크의 현재 가스비를 반환합니다.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 가스비 조회
+      tags:
+      - Network
+  /wallets/history/ffi:
+    get:
+      consumes:
+      - application/json
+      description: "Rust FFI를 통해 거래 내역을 조회합니다. \U0001F501 내부적으로 Rust FFI 사용"
+      parameters:
+      - description: 지갑 주소
+        in: query
+        name: address
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 거래 내역 조회 (Rust)
+      tags:
+      - Wallet
+  /wallets/history/go:
+    get:
+      consumes:
+      - application/json
+      description: "Moralis API를 통해 거래 내역을 조회합니다. \U0001F501 내부적으로 Rust FFI 사용"
+      parameters:
+      - description: 지갑 주소
+        in: query
+        name: address
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 거래 내역 조회 (Go)
+      tags:
+      - Wallet
+  /wallets/network:
+    get:
+      consumes:
+      - application/json
+      description: 현재 연결된 Polygon Amoy 네트워크의 체인 ID와 블록 번호를 반환합니다.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 네트워크 정보
+      tags:
+      - Network
+  /wallets/private-key:
+    get:
+      consumes:
+      - application/json
+      description: 새로운 개인키를 생성합니다.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 개인키 생성
+      tags:
+      - Wallet
+  /wallets/qrcode:
+    get:
+      consumes:
+      - application/json
+      description: 입력된 주소에 대한 QR코드를 이미지로 반환합니다.
+      parameters:
+      - description: 주소
+        in: query
+        name: address
+        required: true
+        type: string
+      produces:
+      - image/png
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: QR코드 생성
+      tags:
+      - Wallet
+  /wallets/recent:
+    get:
+      consumes:
+      - application/json
+      description: 최근에 송금한 주소 목록을 시간 순으로 반환합니다.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.RecentAddress'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 최근 송금 주소 조회
+      tags:
+      - Wallet
+  /wallets/recover:
+    get:
+      consumes:
+      - application/json
+      description: "니모닉으로 지갑을 복구합니다. \U0001F501 내부적으로 Rust FFI 사용"
+      parameters:
+      - description: 니모닉 24단어
+        in: query
+        name: mnemonic
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.RecoverResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 지갑 복구
+      tags:
+      - Wallet
+  /wallets/registered:
+    get:
+      consumes:
+      - application/json
+      description: 외부 지갑 주소와 라벨 목록을 반환합니다.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.RegisteredWallet'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 등록된 외부 지갑 조회
+      tags:
+      - Wallet
+  /wallets/scan:
+    get:
+      consumes:
+      - application/json
+      description: Moralis API를 통해 최근 트랜잭션 내역을 조회합니다.
+      parameters:
+      - description: 지갑 주소
+        in: query
+        name: address
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 최근 트랜잭션 스캔
+      tags:
+      - Transaction
+  /wallets/send:
+    get:
+      consumes:
+      - application/json
+      description: "MATIC을 송금합니다. \U0001F501 내부적으로 Rust FFI 사용"
+      parameters:
+      - description: 받는 주소
+        in: query
+        name: to
+        required: true
+        type: string
+      - description: 금액 (MATIC)
+        in: query
+        name: amount
+        required: true
+        type: string
+      - description: 보내는 사람의 개인키
+        in: query
+        name: private_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.TransactionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 트랜잭션 전송
+      tags:
+      - Wallet
+  /wallets/set-password:
+    post:
+      consumes:
+      - application/json
+      description: 비밀번호를 해시화하여 DB에 저장합니다.
+      parameters:
+      - description: '비밀번호 페이로드 (예: {\'
+        in: body
+        name: payload
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.PasswordStatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 비밀번호 저장
+      tags:
+      - Auth
+  /wallets/verify:
+    get:
+      consumes:
+      - application/json
+      description: "입력한 니모닉의 유효성을 검증합니다. \U0001F501 내부적으로 Rust FFI 사용"
+      parameters:
+      - description: 니모닉 24단어
+        in: query
+        name: mnemonic
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 니모닉 유효성 확인
+      tags:
+      - Wallet
+  /wallets/verify-password:
+    post:
+      consumes:
+      - application/json
+      description: 저장된 비밀번호 해시와 비교하여 일치 여부를 확인합니다.
+      parameters:
+      - description: 비밀번호 페이로드
+        in: body
+        name: payload
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.PasswordStatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: 비밀번호 검증
+      tags:
+      - Auth
+swagger: "2.0"
