@@ -30,15 +30,14 @@ jobs:
           printf "%s\n" "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/sm-deploy.pem
           chmod 400 ~/.ssh/sm-deploy.pem
 
-      - name: 🚚 Deploy binaries to EC2
+      - name: 🚚 Deploy binaries to EC2 (root user)
         run: |
           rsync -avz -e "ssh -i ~/.ssh/sm-deploy.pem -o StrictHostKeyChecking=no" \
             ./librust_wallet.a ./go-server/myapp \
-            ubuntu@43.201.26.30:/home/ubuntu/Sock-Server/
+            root@moply.me:/root/sock-wallet-server/Sock-Server/
 
-      - name: 🔄 (Optional) Restart service on EC2
+      - name: 🔄 Restart service on EC2 (systemd)
         run: |
-          ssh -i ~/.ssh/sm-deploy.pem -o StrictHostKeyChecking=no ubuntu@43.201.26.30 << 'EOF'
-            chmod +x /home/ubuntu/Sock-Server/myapp
-            # ./myapp or sudo systemctl restart myapp.service
+          ssh -i ~/.ssh/sm-deploy.pem -o StrictHostKeyChecking=no root@moply.me << 'EOF'
+            systemctl restart sock-wallet
           EOF
