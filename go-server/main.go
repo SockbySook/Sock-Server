@@ -815,10 +815,10 @@ func main() {
 	db.InitDB()
 	registerHandlers()
 
-	log.Println("🚀 Server running at http://0.0.0.0:8081")
+	log.Println("🚀 Server running at http://0.0.0.0:8082")
 
 	// ⬇️ IPv4에만 바인딩
-	listener, err := net.Listen("tcp4", "0.0.0.0:8081")
+	listener, err := net.Listen("tcp4", "0.0.0.0:8082")
 	if err != nil {
 		log.Fatalf("❌ 포트 리스닝 실패: %v", err)
 	}
