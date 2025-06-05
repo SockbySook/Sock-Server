@@ -16,6 +16,7 @@ import (
 	"go-server/db"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -814,8 +815,15 @@ func main() {
 	db.InitDB()
 	registerHandlers()
 
-	log.Println("🚀 Server running at http://localhost:8080")
-	err = http.ListenAndServe("0.0.0.0:8080", nil)
+	log.Println("🚀 Server running at http://0.0.0.0:8080")
+
+	// ⬇️ IPv4에만 바인딩
+	listener, err := net.Listen("tcp4", "0.0.0.0:8080")
+	if err != nil {
+		log.Fatalf("❌ 포트 리스닝 실패: %v", err)
+	}
+
+	err = http.Serve(listener, nil)
 	if err != nil {
 		log.Fatalf("❌ 서버 시작 실패: %v", err)
 	}

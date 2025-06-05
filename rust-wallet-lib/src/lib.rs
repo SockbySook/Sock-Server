@@ -11,6 +11,7 @@ use web3::signing::{Key, SecretKey};
 use tokio::runtime::Runtime;
 use k256::elliptic_curve::generic_array::{GenericArray, typenum};
 use std::env;
+use reqwest::blocking::Client;
 
 /// ✅ 24개 단어 니모닉을 생성
 #[no_mangle]
@@ -143,9 +144,6 @@ pub extern "C" fn free_string(s: *mut c_char) {
 /// ✅ Moralis를 통한 트랜잭션 내역 조회
 #[no_mangle]
 pub extern "C" fn get_transaction_history(address: *const c_char) -> *mut c_char {
-    use reqwest::blocking::Client;
-    use std::str::FromStr;
-
     let address = unsafe {
         if address.is_null() {
             return CString::new("invalid address").unwrap().into_raw();
