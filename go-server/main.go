@@ -780,7 +780,7 @@ func getRegisteredWalletsHandler(w http.ResponseWriter, r *http.Request) {
 // ✅ 리팩토링: 핸들러 등록 함수 분리
 func registerHandlers() {
 	http.HandleFunc("/wallets/create", generateMnemonicHandler)
-	http.HandleFunc("/sock/wallets/address", generateAddressHandler)
+	http.HandleFunc("/wallets/address", generateAddressHandler)
 	http.HandleFunc("/wallets/balance", getBalanceHandler)
 	http.HandleFunc("/wallets/send", sendTransactionHandler)
 	http.HandleFunc("/wallets/history/go", getTxHistoryHandler)
