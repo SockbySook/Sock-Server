@@ -98,7 +98,7 @@ type RegisteredWallet struct {
 }
 
 // ✅ 최근 송금 주소를 DB에 저장
-func saveRecentAddress(address string) {
+func saveRecentAddress(user string, address string) {
 	conn := db.GetDB()
 	if conn == nil {
 		fmt.Println("❗ DB 연결이 초기화되지 않았습니다.")
@@ -106,15 +106,15 @@ func saveRecentAddress(address string) {
 	}
 
 	stmt := `
-	INSERT INTO recent_addresses (address, last_used)
-	VALUES (?, ?)
-	ON CONFLICT(address) DO UPDATE SET last_used=excluded.last_used;
+	INSERT INTO recent_addresses (user, address, last_used)
+	VALUES (?, ?, ?)
+	ON CONFLICT(user, address) DO UPDATE SET last_used = excluded.last_used;
 	`
-	_, err := conn.Exec(stmt, address, time.Now())
+	_, err := conn.Exec(stmt, user, address, time.Now())
 	if err != nil {
-		fmt.Println("❌ 주소 저장 실패:", err)
+		fmt.Println("❌ 최근 주소 저장 실패:", err)
 	} else {
-		fmt.Println("📌 최근 송금 주소 저장됨:", address)
+		fmt.Println("📌 최근 송금 주소 저장됨:", user, address)
 	}
 }
 
@@ -611,7 +611,13 @@ func sendTransactionHandler(w http.ResponseWriter, r *http.Request) {
 
 	txHash := C.GoString(C.send_transaction(toC, amountC, privC))
 
-	saveRecentAddress(to)
+	user := r.Header.Get("X-User-Address")
+	if user == "" {
+		http.Error(w, "Missing user info", http.StatusBadRequest)
+		return
+	}
+
+	saveRecentAddress(user, to)
 
 	resp := map[string]string{"tx_hash": txHash}
 	json.NewEncoder(w).Encode(resp)
@@ -628,8 +634,20 @@ func sendTransactionHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure     400 {object} ErrorResponse
 // @Router      /wallets/recent [get]
 func getRecentAddressesHandler(w http.ResponseWriter, r *http.Request) {
+	user := r.URL.Query().Get("user") // 또는 JWT/헤더에서 가져오기
+	if user == "" {
+		http.Error(w, "Missing user parameter", http.StatusBadRequest)
+		return
+	}
+
 	conn := db.GetDB()
-	rows, err := conn.Query("SELECT address, last_used FROM recent_addresses ORDER BY last_used DESC LIMIT 10")
+	rows, err := conn.Query(`
+		SELECT address, last_used
+		FROM recent_addresses
+		WHERE user = ?
+		ORDER BY last_used DESC
+		LIMIT 10
+	`, user)
 	if err != nil {
 		http.Error(w, "Failed to fetch recent addresses", http.StatusInternalServerError)
 		return

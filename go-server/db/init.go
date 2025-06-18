@@ -24,9 +24,10 @@ func InitDB() {
 		// 최근 송금 주소 테이블 생성
 		createRecentAddressesTable := `
 		CREATE TABLE IF NOT EXISTS recent_addresses (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			address TEXT NOT NULL UNIQUE,
-			last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			user TEXT NOT NULL,
+			address TEXT NOT NULL,
+			last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (user, address)
 		);`
 		_, err = db.Exec(createRecentAddressesTable)
 		if err != nil {
