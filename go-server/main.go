@@ -649,6 +649,7 @@ func getRecentAddressesHandler(w http.ResponseWriter, r *http.Request) {
 		LIMIT 10
 	`, user)
 	if err != nil {
+		log.Printf("❌ DB 쿼리 에러: %v", err)
 		http.Error(w, "Failed to fetch recent addresses", http.StatusInternalServerError)
 		return
 	}
