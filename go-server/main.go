@@ -634,7 +634,7 @@ func sendTransactionHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure     400 {object} ErrorResponse
 // @Router      /wallets/recent [get]
 func getRecentAddressesHandler(w http.ResponseWriter, r *http.Request) {
-	user := r.Header.Get("X-User-Address") // ✅ 헤더에서 읽기
+	user := r.URL.Query().Get("user")
 	if user == "" {
 		http.Error(w, "Missing user header", http.StatusBadRequest)
 		return
