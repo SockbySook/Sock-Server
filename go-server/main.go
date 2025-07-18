@@ -634,9 +634,9 @@ func sendTransactionHandler(w http.ResponseWriter, r *http.Request) {
 // @Failure     400 {object} ErrorResponse
 // @Router      /wallets/recent [get]
 func getRecentAddressesHandler(w http.ResponseWriter, r *http.Request) {
-	user := r.URL.Query().Get("user") // 또는 JWT/헤더에서 가져오기
+	user := r.Header.Get("X-User-Address") // ✅ 헤더에서 읽기
 	if user == "" {
-		http.Error(w, "Missing user parameter", http.StatusBadRequest)
+		http.Error(w, "Missing user header", http.StatusBadRequest)
 		return
 	}
 
